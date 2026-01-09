@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/sitanshunandan/neurosync/internal/core/domain"
+	"github.com/sitanshunandan/neurosync/internal/core/ports"
 	"github.com/sitanshunandan/neurosync/internal/logic"
 )
 
@@ -25,10 +27,12 @@ type TaskRequest struct {
 }
 
 // Handler holds dependencies (like database connections, if we had any)
-type Handler struct{}
+type Handler struct {
+	repo ports.SchedulerRepository
+}
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(repo ports.SchedulerRepository) *Handler {
+	return &Handler{repo: repo}
 }
 
 // HandleSchedule is the POST /schedule endpoint
@@ -70,7 +74,29 @@ func (h *Handler) HandleSchedule(w http.ResponseWriter, r *http.Request) {
 	// We use the request's WakeTime as the start of the day for simplicity
 	schedule := logic.ScheduleTasks(bio, tasks, req.WakeTime)
 
+	if err := h.repo.Save(schedule); err != nil {
+		http.Error(w, "Failed to save schedule", http.StatusInternalServerError)
+		return
+	}
+
 	// 4. Encode Response (JSON)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(schedule)
+}
+
+func (h *Handler) HandleGetSchedule(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "userID")
+
+	schedule, err := h.repo.Get(userID)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if schedule == nil {
+		http.Error(w, "Schedule not found", http.StatusNotFound)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(schedule)
 }
