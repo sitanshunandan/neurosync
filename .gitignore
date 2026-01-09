@@ -1,0 +1,11 @@
+# Binaries
+/bin/
+neurosync
+neurosync.exe
+
+# OS junk
+.DS_Store
+
+# User Secrets (Crucial!)
+.env
+*.db
