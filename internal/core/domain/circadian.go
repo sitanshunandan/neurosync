@@ -6,29 +6,32 @@ import (
 )
 
 // CalculateCognitiveCapacity returns a score (0-100) for a specific time
+
 func CalculateCognitiveCapacity(bio BioRhythm, targetTime time.Time) int {
-	// 1. Process S (Sleep Pressure): Linear decay since waking
 	hoursAwake := targetTime.Sub(bio.WakeTime).Hours()
-	if hoursAwake < 0 {
-		return 0 // Hasn't woken up yet
+
+	// 1. Sleep Inertia: If they just woke up (< 1 hour), they are groggy.
+	if hoursAwake < 1.0 {
+		return int(30 * bio.SleepQuality)
 	}
 
-	// Homeostatic pressure increases with time awake.
-	// Capacity drops linearly.
-	processS := 100.0 - (hoursAwake * 5.5)
+	// 2. Process S (Sleep Pressure):
+	// Decays faster now (4.5 points/hr) to force a drop by evening.
+	processS := 100.0 - (hoursAwake * 4.5)
 
-	// 2. Process C (Circadian Drive): Sine wave
-	// We want peak at WakeTime + 4h.
-	// This is a heuristic simulation of the Cortisol/Melatonin curves.
-	circadianFluctuation := 15.0 * math.Sin((math.Pi/8.0)*(hoursAwake-1.0))
+	// 3. Process C (Circadian Drive):
+	// High amplitude (25.0) to create a distinct Peak and Dip.
+	// Shifted so peak is at ~3 hours awake, Dip at ~14 hours awake.
+	circadianFluctuation := 25.0 * math.Sin((math.Pi/10.0)*(hoursAwake-2.0))
 
 	totalCapacity := processS + circadianFluctuation
 
-	// Penalize for poor sleep quality
+	// Apply Sleep Quality penalty
 	totalCapacity *= bio.SleepQuality
 
-	if totalCapacity < 0 {
-		return 0
+	// Bounds checking
+	if totalCapacity < 5 {
+		return 5
 	}
 	if totalCapacity > 100 {
 		return 100

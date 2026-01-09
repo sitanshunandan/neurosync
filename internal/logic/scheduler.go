@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -13,53 +14,57 @@ type Schedule struct {
 	Items  []domain.Task
 }
 
-// ScheduleTasks assigns time slots to tasks based on biological capacity
 func ScheduleTasks(bio domain.BioRhythm, tasks []domain.Task, dayStart time.Time) Schedule {
-	// 1. Sort Tasks: Hardest (Creative/Analytical) first.
-	// We want to fit the "big rocks" into the jar first.
+	// 1. Sort Tasks: Hardest first (Optimization strategy)
 	sort.Slice(tasks, func(i, j int) bool {
 		return tasks[i].Cost.Level > tasks[j].Cost.Level
 	})
 
 	var scheduled []domain.Task
 
-	// 2. Iterate through tasks and find the best slot
+	// NEW: Keep track of the earliest free slot
+	// We assume the user starts working at WakeTime + 1 hour (e.g., 8:00 AM)
+	// (Or you can pass a specific 'WorkStartTime')
+	currentTimePointer := bio.WakeTime.Add(1 * time.Hour)
+
 	for _, task := range tasks {
 		bestStartTime := time.Time{}
-		bestScore := -1
+		foundSlot := false
 
-		// Scan from WakeTime to +16 hours
-		for h := 0; h < 16; h++ {
-			slotTime := bio.WakeTime.Add(time.Duration(h) * time.Hour)
+		// Scan from the Current Pointer forward (up to 16h after wake)
+		// We limit the search to avoid infinite loops
+		searchLimit := bio.WakeTime.Add(16 * time.Hour)
 
-			// Ask the Brain: "How much energy do we have at this hour?"
-			capacity := domain.CalculateCognitiveCapacity(bio, slotTime)
+		// Check every 30 mins from where we left off
+		for t := currentTimePointer; t.Before(searchLimit); t = t.Add(30 * time.Minute) {
+
+			// Ask the Brain: "Do we have energy here?"
+			capacity := domain.CalculateCognitiveCapacity(bio, t)
 
 			// Requirement: Task Level * 10 <= Capacity
-			// Level 8 task needs 80+ energy.
 			requiredCap := task.Cost.Level * 10
 
 			if capacity >= requiredCap {
-				// Simple collision detection (MVP):
-				// In a real app, we'd check if slot is already taken.
-				// Here we just find the *earliest* matching slot.
-				bestStartTime = slotTime
-				bestScore = capacity
-				break
+				bestStartTime = t
+				foundSlot = true
+				break // Found a spot!
 			}
 		}
 
-		if bestScore != -1 {
+		if foundSlot {
 			t := bestStartTime
-			task.FixedTime = &t // Assign the time
+			task.FixedTime = &t
 			scheduled = append(scheduled, task)
+
+			// CRITICAL FIX: Advance the pointer!
+			// The next task cannot start until this one finishes.
+			currentTimePointer = bestStartTime.Add(task.Duration)
 		} else {
-			// If no slot fits (e.g., too tired), we might log it or skip it
-			// For now, let's skip appending it so we see what couldn't get done.
+			fmt.Printf("⚠️ Could not schedule task: %s (Req: %d, Best Cap: Low)\n", task.Title, task.Cost.Level*10)
 		}
 	}
 
-	// Resort by Time (so the printed schedule is chronological)
+	// Resort by Time for the display
 	sort.Slice(scheduled, func(i, j int) bool {
 		return scheduled[i].FixedTime.Before(*scheduled[j].FixedTime)
 	})
