@@ -1,0 +1,12 @@
+# Ignore the Git history
+.git
+
+# Ignore local compiled binaries
+*.exe
+*.test
+
+# Ignore the local database (so the container starts clean)
+neurosync.db
+
+# Ignore IDE settings
+.vscode
