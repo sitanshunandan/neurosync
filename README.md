@@ -1,42 +1,71 @@
-# NeuroSync Engine 🧠⚡
+# NeuroSync: Circadian-Aware Task Scheduler
 
-> A biologically-aware job scheduler that optimizes productivity based on circadian rhythms and homeostatic sleep pressure.
+NeuroSync is a Go microservice that optimizes task scheduling by aligning workload difficulty with predicted biological alertness levels based on the Two-Process Model of sleep regulation.
 
-**Status:** _Pre-Alpha (MVP)_ | **Stack:** Go (Golang)
+## Methodology
+Unlike standard calendars that allocate time slots based on availability, NeuroSync utilizes a bio-mathematical model to estimate cognitive capacity.
 
----
+* **Process S (Homeostatic Sleep Drive):** Models fatigue accumulation relative to wake time.
+* **Process C (Circadian Rhythm):** Models the oscillation of alertness, accounting for variations such as the afternoon energy dip.
 
-## 📖 The Problem
-Traditional calendars are **static**. They schedule tasks based on *time* (e.g., "Meeting at 2:00 PM"), ignoring the biological reality that human cognitive capacity fluctuates dramatically throughout the day.
+The system accepts a task list with associated difficulty ratings and applies a greedy algorithm to assign high-load tasks to peak alertness windows and low-load tasks to periods of lower energy.
 
-## 💡 The Solution
-**NeuroSync** is a headless backend engine that:
-1.  **Ingests Biological Data:** Wake time, sleep quality, and caffeine intake.
-2.  **Models Cognitive State:** Uses the **Two-Process Model of Sleep Regulation** (Process C + Process S) to predict real-time alertness.
-3.  **Optimizes Schedules:** Automatically assigns high-load tasks (creative/analytical) to peak energy windows and administrative tasks to "slump" periods.
+## Scheduling Comparison
+The following table compares a standard time-based schedule against the NeuroSync capacity-based schedule for a high-focus task (System Design) and a low-focus task (Administrative Updates).
 
----
+| Time Window | Standard Allocation | NeuroSync Allocation |
+| :--- | :--- | :--- |
+| **10:00 AM** | Administrative Updates | **System Design** (Peak Focus) |
+| **03:00 PM** | System Design | **Administrative Updates** (Recovery) |
 
-## 🔬 The Science (How it Works)
-The engine calculates a **Cognitive Capacity Score (0-100)** for every hour of the day using a weighted algorithm:
+## Technical Architecture
+The application is structured using **Hexagonal Architecture** to separate business logic from external interfaces.
 
-* **Process S (Sleep Pressure):** A linear decay function representing the buildup of adenosine (fatigue) the longer you stay awake.
-* **Process C (Circadian Drive):** A sinusoidal oscillation mimicking the body's cortisol/melatonin release cycles.
-* **Ultradian Modulation:** (Coming Soon) 90-minute energy cycles for granular task batching.
+* **Language:** Go 1.25
+* **Database:** SQLite
+* **Containerization:** Docker (Alpine Linux)
+* **Routing:** Chi
 
----
+### Directory Structure
+* `internal/core/domain`: Business logic entities and cognitive load models.
+* `internal/core/ports`: Input/Output interfaces.
+* `internal/adapters`: Implementation of ports (HTTP handlers, SQL repositories).
 
-## 🏗️ Architecture
-This project follows **Hexagonal Architecture (Ports & Adapters)** to decouple biological logic from infrastructure.
+## Usage
 
-```text
-neurosync/
-├── cmd/                # Application entry points
-├── internal/
-│   ├── core/           # PURE LOGIC (The "Brain")
-│   │   ├── domain/     # Structs: BioRhythm, Task, CognitiveLoad
-│   │   └── ports/      # Interfaces for repositories/services
-│   ├── logic/          # Algorithms: Circadian math, Scheduler
-│   └── adapters/       # INFRASTRUCTURE (The "Limbs")
-│       └── handlers/   # HTTP / CLI handlers
-└── docs/               # Architecture Decision Records (ADRs)
+### Docker Build & Run
+Run the following commands to build and start the container:
+
+```bash
+# 1. Build the image
+docker build -t neurosync-backend .
+
+# 2. Run the container (Access at localhost:8080)
+docker run -p 8080:8080 neurosync-backend
+
+API Endpoints
+1. Generate Schedule (POST)
+
+Submit a user's wake time and tasks to generate an optimized schedule.
+
+Endpoint: POST /schedule
+
+Body:
+JSON
+
+{
+  "user_id": "test_user",
+  "wake_time": "2026-01-14T07:00:00Z",
+  "tasks": [
+    { "title": "System Design", "duration": 120, "difficulty": 3 },
+    { "title": "Email Catchup", "duration": 30, "difficulty": 1 }
+  ]
+}
+
+2. Retrieve Schedule (GET)
+
+Fetch the stored schedule for a specific user.
+
+Endpoint: GET /schedule/{user_id}
+
+Example: GET /schedule/test_user
